@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pintu_postgres
+    environment:
+      POSTGRES_USER: pintu_user
+      POSTGRES_PASSWORD: pintu_password
+      POSTGRES_DB: pintu_quant
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pintu_user -d pintu_quant"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pintu_fastapi_backend
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://pintu_user:pintu_password@postgres:5432/pintu_quant
+      - FETCH_INTERVAL_SECONDS=60
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pintu_nextjs_frontend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: always
+
+volumes:
+  postgres_data:
